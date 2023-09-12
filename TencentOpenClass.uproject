@@ -1,0 +1,13 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "{EBBFEEB1-4B6D-8471-CF44-5CACE121DB45}",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "TencentOpenClass",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
