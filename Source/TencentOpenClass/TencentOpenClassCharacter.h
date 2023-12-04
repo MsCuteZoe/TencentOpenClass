@@ -4,10 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemInterface.h"
+#include "LOLAttributeSet.h"
 #include "TencentOpenClassCharacter.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChangeDelegate, float, NewHealth);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnManaChangeDelegate, float, NewMana);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSpeedChangeDelegate, float, NewSpeed);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInputMovementDelegate);
+
 UCLASS(config=Game)
-class ATencentOpenClassCharacter : public ACharacter
+class ATencentOpenClassCharacter : public ACharacter, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -18,9 +26,12 @@ class ATencentOpenClassCharacter : public ACharacter
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FollowCamera;
+
+
 public:
 	ATencentOpenClassCharacter();
-
+	
+	
 	/** Base turn rate, in deg/sec. Other scaling may affect final turn rate. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
 	float BaseTurnRate;
@@ -28,6 +39,42 @@ public:
 	/** Base look up/down rate, in deg/sec. Other scaling may affect final rate. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
 	float BaseLookUpRate;
+
+	// AbilitySystemComponent
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AbilitySystem")
+	UAbilitySystemComponent* AbilitySystemComp;
+
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	UFUNCTION(BlueprintCallable, Category = "AbilitySystem")
+	void GiveAbility(TSubclassOf<UGameplayAbility> Ability);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AbilitySystem")
+	TArray<TSubclassOf<UGameplayAbility>> PreloadedAbilities;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AbilitySystem")
+	ULOLAttributeSet* AttributeSet;
+
+
+	
+	// Attributes Changed Delegations
+	UPROPERTY(BlueprintAssignable, Category = "AbilitySystem")
+	FOnHealthChangeDelegate OnHealthChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "AbilitySystem")
+	FOnManaChangeDelegate OnManaChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "AbilitySystem")
+	FOnSpeedChangeDelegate OnSpeedChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "AbilitySystem")
+	FOnInputMovementDelegate OnInputMovement;
+	
+	void HandleHealthChanged(const FOnAttributeChangeData& Data);
+	void HandleManaChanged(const FOnAttributeChangeData& Data);
+	void HandleSpeedChanged(const FOnAttributeChangeData& Data);
+
+	void HandleInputMovement();
 
 protected:
 
@@ -68,5 +115,9 @@ public:
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+	virtual void BeginPlay() override;
+
+	virtual void PreInitializeComponents() override;
 };
 

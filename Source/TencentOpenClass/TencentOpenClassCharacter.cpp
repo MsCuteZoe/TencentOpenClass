@@ -2,9 +2,11 @@
 
 #include "TencentOpenClassCharacter.h"
 #include "HeadMountedDisplayFunctionLibrary.h"
+#include "LOLAttributeSet.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -42,9 +44,12 @@ ATencentOpenClassCharacter::ATencentOpenClassCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
-
+	
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named MyCharacter (to avoid direct content references in C++)
+
+	AbilitySystemComp = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComp"));
+	AttributeSet = CreateDefaultSubobject<ULOLAttributeSet>(TEXT("AttributeSet"));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -76,6 +81,82 @@ void ATencentOpenClassCharacter::SetupPlayerInputComponent(class UInputComponent
 	PlayerInputComponent->BindAction("ResetVR", IE_Pressed, this, &ATencentOpenClassCharacter::OnResetVR);
 }
 
+void ATencentOpenClassCharacter::BeginPlay() {
+	Super::BeginPlay();
+	if (AbilitySystemComp != nullptr)
+	{
+		//初始化技能
+		if (PreloadedAbilities.Num() > 0)
+		{
+			for (auto i = 0; i < PreloadedAbilities.Num(); i++)
+			{
+				if (PreloadedAbilities[i] != nullptr)
+				{
+					// 为什么PreloadedAbilities[i]后面要用->运算符？
+					// 因为
+					if (PreloadedAbilities[i]->IsChildOf(UGameplayAbility::StaticClass())) {
+						
+					}
+					// FGameplayAbilitySpec是GA的实例，其构造函数的第二个参数代表GA的等级，这里暂令其全部为1
+					AbilitySystemComp->GiveAbility(FGameplayAbilitySpec(PreloadedAbilities[i].GetDefaultObject(), 1));
+				}
+			}
+		}
+
+		//初始化ASC
+		AbilitySystemComp->InitAbilityActorInfo(this, this);
+		AbilitySystemComp->GetGameplayAttributeValueChangeDelegate(ULOLAttributeSet::GetHealthAttribute())
+			.AddUObject(this, &ATencentOpenClassCharacter::HandleHealthChanged);
+
+		AbilitySystemComp->GetGameplayAttributeValueChangeDelegate(ULOLAttributeSet::GetManaAttribute())
+			.AddUObject(this, &ATencentOpenClassCharacter::HandleManaChanged);
+
+		AbilitySystemComp->GetGameplayAttributeValueChangeDelegate(ULOLAttributeSet::GetMaxHealthAttribute())
+			.AddUObject(this, &ATencentOpenClassCharacter::HandleHealthChanged);
+
+		AbilitySystemComp->GetGameplayAttributeValueChangeDelegate(ULOLAttributeSet::GetMaxManaAttribute())
+			.AddUObject(this, &ATencentOpenClassCharacter::HandleManaChanged);
+
+		AbilitySystemComp->GetGameplayAttributeValueChangeDelegate(ULOLAttributeSet::GetSpeedAttribute())
+			.AddUObject(this, &ATencentOpenClassCharacter::HandleSpeedChanged);
+	}
+	
+}
+
+void ATencentOpenClassCharacter::PreInitializeComponents() {
+	Super::PreInitializeComponents();
+	
+}
+
+
+UAbilitySystemComponent* ATencentOpenClassCharacter::GetAbilitySystemComponent() const {
+	return AbilitySystemComp;
+}
+ 
+void ATencentOpenClassCharacter::GiveAbility(TSubclassOf<UGameplayAbility> Ability) {
+	if (AbilitySystemComp) {
+		if (HasAuthority() && Ability) {
+			AbilitySystemComp->GiveAbility(FGameplayAbilitySpec(Ability.GetDefaultObject(), 1));
+		}
+	}
+}
+
+
+void ATencentOpenClassCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data) {
+	OnHealthChanged.Broadcast(Data.NewValue);
+}
+
+void ATencentOpenClassCharacter::HandleManaChanged(const FOnAttributeChangeData& Data) {
+	OnManaChanged.Broadcast(Data.NewValue);
+}
+
+void ATencentOpenClassCharacter::HandleSpeedChanged(const FOnAttributeChangeData& Data) {
+	OnSpeedChanged.Broadcast(Data.NewValue);
+}
+
+void ATencentOpenClassCharacter::HandleInputMovement() {
+	OnInputMovement.Broadcast();
+}
 
 void ATencentOpenClassCharacter::OnResetVR()
 {
@@ -121,6 +202,8 @@ void ATencentOpenClassCharacter::MoveForward(float Value)
 		// get forward vector
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 		AddMovementInput(Direction, Value);
+
+		HandleInputMovement();
 	}
 }
 
@@ -136,5 +219,7 @@ void ATencentOpenClassCharacter::MoveRight(float Value)
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 		// add movement in that direction
 		AddMovementInput(Direction, Value);
+		
+		HandleInputMovement();
 	}
 }

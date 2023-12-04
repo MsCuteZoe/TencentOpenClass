@@ -8,6 +8,7 @@ public class TencentOpenClass : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "HeadMountedDisplay" });
+		PublicDependencyModuleNames.AddRange(new string[] { "GameplayTasks", "GameplayAbilities", "GameplayTags", 
+			"Core", "CoreUObject", "Engine", "InputCore", "HeadMountedDisplay" });
 	}
 }
